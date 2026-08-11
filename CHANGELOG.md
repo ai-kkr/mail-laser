@@ -7,6 +7,7 @@
 ### Features
 
 * **smtp:** accept catch-all recipients via `MAIL_LASER_TARGET_DOMAINS` (exact `MAIL_LASER_TARGET_EMAILS` still supported; at least one list required)
+* **docker:** publish multi-arch images (`linux/amd64` + `linux/arm64`) to `ghcr.io/ai-kkr/mail-laser`
 
 
 <a name="v3.0.2"></a>
