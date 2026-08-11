@@ -1,6 +1,14 @@
 # CHANGELOG (MailLaser)
 
 
+<a name="v3.1.2"></a>
+## [v3.1.2](https://github.com/ai-kkr/mail-laser/compare/v3.1.1...v3.1.2) (ai-kkr fork)
+
+### Bug Fixes
+
+* **smtp:** accept ESMTP parameters on MAIL FROM / RCPT TO (e.g. Gmail `SIZE=5043`)
+
+
 <a name="v3.1.1"></a>
 ## [v3.1.1](https://github.com/ai-kkr/mail-laser/compare/v3.1.0...v3.1.1) (ai-kkr fork)
 

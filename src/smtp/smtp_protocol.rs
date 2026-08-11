@@ -250,11 +250,13 @@ where
     /// Uses `mailparse::addrparse` to robustly handle addresses with or without
     /// display names, enclosed in angle brackets or not (within the command syntax).
     /// Expects input like "MAIL FROM:<user@example.com>" or "RCPT TO:<Name <user@example.com>>".
+    /// Trailing ESMTP parameters (e.g. `SIZE=5043` on MAIL FROM) are ignored.
     fn extract_email(&self, line: &str) -> Option<String> {
         // Find the colon separating the command verb from the address part.
         let addr_part = line.split_once(':').map(|(_cmd, addr)| addr.trim());
 
         addr_part.and_then(|addr_spec| {
+            let addr_spec = strip_esmtp_mail_params(addr_spec);
             // Remove outer angle brackets if present, as addrparse expects the raw address spec.
             let spec_to_parse = addr_spec
                 .strip_prefix('<')
@@ -293,6 +295,33 @@ where
     /// Returns the current `SmtpState` of the protocol handler.
     pub fn get_state(&self) -> SmtpState {
         self.state
+    }
+}
+
+/// Drops trailing ESMTP parameters after the reverse-path / forward-path.
+///
+/// RFC 5321 allows `MAIL FROM:<user@example.com> SIZE=5043` (and similar
+/// `RCPT TO:` extensions). Only the path token is returned for address parsing.
+fn strip_esmtp_mail_params(addr_spec: &str) -> &str {
+    let trimmed = addr_spec.trim();
+    if let Some(rest) = trimmed.strip_prefix('<') {
+        let mut depth = 1usize;
+        for (i, c) in rest.char_indices() {
+            match c {
+                '<' => depth = depth.saturating_add(1),
+                '>' => {
+                    depth = depth.saturating_sub(1);
+                    if depth == 0 {
+                        // `rest` is sliced one byte past the opening '<'.
+                        return &trimmed[..=i + '<'.len_utf8()];
+                    }
+                }
+                _ => {}
+            }
+        }
+        trimmed
+    } else {
+        trimmed.split_whitespace().next().unwrap_or(trimmed)
     }
 }
 
@@ -506,6 +535,41 @@ mod tests {
         let protocol = create_test_protocol();
         let result = protocol.extract_email("RCPT TO:recipient@example.com");
         assert_eq!(result, Some("recipient@example.com".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_extract_email_mail_from_with_size_param() {
+        let protocol = create_test_protocol();
+        // Gmail and other ESMTP senders append SIZE= after the reverse-path.
+        let result = protocol.extract_email("MAIL FROM:<andvikt@gmail.com> SIZE=5043");
+        assert_eq!(result, Some("andvikt@gmail.com".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_extract_email_mail_from_plain_with_params() {
+        let protocol = create_test_protocol();
+        let result = protocol.extract_email("MAIL FROM:user@example.com SIZE=100 BODY=8BITMIME");
+        assert_eq!(result, Some("user@example.com".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_extract_email_nested_brackets_with_size_param() {
+        let protocol = create_test_protocol();
+        let result =
+            protocol.extract_email("MAIL FROM:<John Doe <john@example.com>> SIZE=99");
+        assert_eq!(result, Some("john@example.com".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_strip_esmtp_mail_params_helpers() {
+        assert_eq!(
+            strip_esmtp_mail_params("<user@example.com> SIZE=5043"),
+            "<user@example.com>"
+        );
+        assert_eq!(
+            strip_esmtp_mail_params("user@example.com SIZE=1"),
+            "user@example.com"
+        );
     }
 
     // --- Full state machine walkthrough ---
