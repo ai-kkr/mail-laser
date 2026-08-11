@@ -45,6 +45,32 @@ fn test_webhook_client_user_agent() {
     assert_eq!(client.user_agent, expected_user_agent);
 }
 
+#[test]
+fn allows_plain_http_loopback_and_docker_hosts() {
+    assert!(allows_plain_http(
+        "http://app:8000/api/v1/webhooks/mail-laser"
+    ));
+    assert!(allows_plain_http("http://minio:9000/hook"));
+    assert!(allows_plain_http("http://127.0.0.1:9000/hook"));
+    assert!(allows_plain_http("http://localhost:9000/hook"));
+    assert!(allows_plain_http("http://[::1]:9000/hook"));
+    assert!(allows_plain_http("http://10.0.0.5:8000/hook"));
+    assert!(allows_plain_http("http://192.168.1.10/hook"));
+    assert!(allows_plain_http("http://[fd12:3456:789a::1]/hook"));
+}
+
+#[test]
+fn allows_plain_http_rejects_public_http_hosts() {
+    assert!(!allows_plain_http("http://example.com/webhook"));
+    assert!(!allows_plain_http(
+        "http://agent.kkr.vhome.su/api/v1/webhooks/mail-laser"
+    ));
+    assert!(!allows_plain_http("http://1.1.1.1/hook"));
+    assert!(!allows_plain_http(
+        "https://app:8000/api/v1/webhooks/mail-laser"
+    ));
+}
+
 // --- HMAC signing tests ---
 
 #[test]

@@ -125,7 +125,7 @@ swaks --to test@example.com --from sender@test.com --server localhost:2525
 ```
 
 {% callout title="HTTP vs HTTPS" %}
-In release builds, MailLaser enforces HTTPS-only for webhook URLs. For local testing with HTTP endpoints, use a debug build (`cargo run` without `--release`).
+In release builds, plain HTTP is allowed for loopback, Docker Compose single-label hosts (e.g. `http://app:8000`), and private IPs; public hosts still need HTTPS. Debug builds allow HTTP for any host.
 {% /callout %}
 
 ---

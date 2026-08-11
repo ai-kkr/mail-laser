@@ -1,6 +1,14 @@
 # CHANGELOG (MailLaser)
 
 
+<a name="v3.1.1"></a>
+## [v3.1.1](https://github.com/ai-kkr/mail-laser/compare/v3.1.0...v3.1.1) (ai-kkr fork)
+
+### Features
+
+* **webhook:** allow plain HTTP in release for docker single-label hosts and private/link-local IPs (e.g. `http://app:8000/...`)
+
+
 <a name="v3.1.0"></a>
 ## [v3.1.0](https://github.com/ai-kkr/mail-laser/compare/v3.0.2...v3.1.0) (ai-kkr fork)
 

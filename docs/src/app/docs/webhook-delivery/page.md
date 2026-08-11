@@ -23,7 +23,7 @@ Every webhook delivery uses these HTTP settings:
 
 The User-Agent header reflects the application name and version from the Cargo package metadata. When `MAIL_LASER_WEBHOOK_SIGNING_SECRET` is configured, each request also carries `X-MailLaser-Timestamp` and `X-MailLaser-Signature-256` — see [Webhook signing](/docs/webhook-signing).
 
-In release builds, MailLaser enforces **HTTPS-only** connections to the webhook URL. In debug builds, HTTP is also permitted for local development.
+In release builds, MailLaser requires **HTTPS** for public webhook hosts. Plain **HTTP** is allowed only for loopback (`127.0.0.1`, `localhost`, `::1`), Docker Compose single-label hostnames (e.g. `http://app:8000/...`), and private / link-local IP literals. In debug builds, HTTP is permitted for any host.
 
 ---
 

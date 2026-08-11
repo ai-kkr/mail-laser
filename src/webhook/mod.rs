@@ -15,6 +15,7 @@ use log::{error, info};
 use serde::{Deserialize, Serialize};
 use sha2::Sha256;
 use std::collections::HashMap;
+use std::net::{Ipv4Addr, Ipv6Addr};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -46,6 +47,41 @@ fn current_unix_secs() -> u64 {
 
 type HttpsConn = hyper_rustls::HttpsConnector<HttpConnector>;
 type WebhookHttpClient = Client<HttpsConn, Full<Bytes>>;
+
+/// Whether a release-build webhook client may use plain HTTP for `webhook_url`.
+///
+/// HTTPS is always allowed via `https_only`. Plain HTTP is restricted to
+/// loopback, Docker Compose single-label hostnames (e.g. `app`), and private /
+/// link-local IP literals — not public FQDNs.
+pub(crate) fn allows_plain_http(webhook_url: &str) -> bool {
+    let Ok(uri) = webhook_url.parse::<hyper::Uri>() else {
+        return false;
+    };
+    if uri.scheme_str() != Some("http") {
+        return false;
+    }
+    let Some(host) = uri.host() else {
+        return false;
+    };
+    let host = host.trim_matches(|c| c == '[' || c == ']');
+
+    if host.eq_ignore_ascii_case("localhost") {
+        return true;
+    }
+    if let Ok(v4) = host.parse::<Ipv4Addr>() {
+        return v4.is_loopback() || v4.is_private() || v4.is_link_local();
+    }
+    if let Ok(v6) = host.parse::<Ipv6Addr>() {
+        return v6.is_loopback() || ipv6_is_unique_local(v6);
+    }
+    // Docker Compose / Swarm DNS: service names are single-label (no dots).
+    !host.is_empty() && !host.contains('.')
+}
+
+fn ipv6_is_unique_local(addr: Ipv6Addr) -> bool {
+    // fc00::/7
+    (addr.segments()[0] & 0xfe00) == 0xfc00
+}
 
 // --- Message types ---
 
@@ -99,21 +135,16 @@ pub struct WebhookClient {
 
 impl WebhookClient {
     pub fn new(config: Config) -> Self {
-        // Allow plain HTTP only for loopback webhook URLs — the
-        // sidecar-on-the-same-task deployment pattern. External hosts still
-        // require HTTPS in release builds.
-        let allow_loopback_http = config.webhook_url.starts_with("http://127.0.0.1")
-            || config.webhook_url.starts_with("http://localhost")
-            || config.webhook_url.starts_with("http://[::1]");
-
         let https = {
             let connector = HttpsConnectorBuilder::new()
                 .with_native_roots()
                 .expect("Failed to load native root certificates for hyper-rustls");
             #[cfg(debug_assertions)]
             let connector = connector.https_or_http();
+            // Release: HTTPS anywhere; plain HTTP only for loopback, docker
+            // single-label hosts, and private/link-local IPs.
             #[cfg(not(debug_assertions))]
-            let connector = if allow_loopback_http {
+            let connector = if allows_plain_http(&config.webhook_url) {
                 connector.https_or_http()
             } else {
                 connector.https_only()

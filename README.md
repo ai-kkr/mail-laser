@@ -35,6 +35,8 @@ docker run -d \
 
 Exact addresses still work (`MAIL_LASER_TARGET_EMAILS`). At least one of `MAIL_LASER_TARGET_EMAILS` or `MAIL_LASER_TARGET_DOMAINS` must be non-empty.
 
+Webhook URL: use `https://…` for public endpoints. In the release image, plain `http://…` is allowed for loopback, Docker Compose service names (e.g. `http://app:8000/api/v1/webhooks/mail-laser`), and private/link-local IPs.
+
 Send a test email with [swaks](https://www.jetmore.org/john/code/swaks/):
 
 ```shell
